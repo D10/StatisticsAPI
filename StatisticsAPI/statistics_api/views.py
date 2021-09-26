@@ -23,22 +23,26 @@ class StatisticViewSet(viewsets.ModelViewSet):
         """Получаем даты из тела запроса и проводим их валидацию"""
         from_date = self.request.POST.get('from')
         to_date = self.request.POST.get('to')
-        if self.to_datetime(from_date) > self.to_datetime(to_date):
-            return
-        return from_date, to_date
+        if from_date and to_date:
+            if self.to_datetime(from_date) < self.to_datetime(to_date):
+                return from_date, to_date
+        return
 
     @action(detail=False)
     def get_statistics(self, *args, **kwargs):
         """Отдает в качестве ответа статистику за определенный промежуток времени отсортированную по дате"""
+        dates = self.get_dates()
+        if not dates:
+            return Response({'response': 'invalid dates'})
         from_date, to_date = self.get_dates()
-        logger.info(f'GET statistics FROM {from_date} TO {to_date}') # Отправляем в логи сообщение о GET запросе
-        query = Statistic.objects.filter(date__gt=from_date).filter(date__lt=to_date).order_by('date')
+        logger.info(f'GET statistics FROM {from_date} TO {to_date}')  # Отправляем в логи сообщение о GET запросе
+        query = Statistic.objects.exclude(date__lt=from_date).exclude(date__gt=to_date).order_by('date')
         response = StatisticSerializer(query, many=True)
         return Response(response.data)
 
     @action(detail=False)
     def clear_statistics(self, *args, **kwargs):
         """Удаляет всю статистику из базы"""
-        logger.info(f'DROP ALL STATISTICS')
+        logger.info(f'DROP ALL STATISTICS')  # Отправляем в логи сообщение о сбросе статистики
         Statistic.objects.all().delete()
         return Response({'success': True})
